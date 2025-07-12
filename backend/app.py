@@ -6,7 +6,14 @@ import numpy as np
 import os
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+
+# Allow cross-origin headers for Safari/iOS
+@app.after_request
+def add_cors_headers(response):
+    response.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    response.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+    return response
 
 # Load model and tools
 MODEL_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "models"))
@@ -74,13 +81,11 @@ def predict():
 
         df_input = pd.DataFrame([input_data])
 
-        # Cast numerics
         numeric_columns = ["Age", "Height", "Weight", "FCVC", "NCP", "CH2O", "FAF", "TUE"]
         for col in numeric_columns:
             if col in df_input.columns:
                 df_input[col] = df_input[col].astype(float)
 
-        # Convert cm to meters if needed
         if df_input["Height"].max() > 10:
             df_input["Height"] = df_input["Height"] / 100.0
 
@@ -88,7 +93,6 @@ def predict():
         height = df_input["Height"].values[0]
         bmi = round(weight / (height ** 2), 2)
 
-        # Encode categorical features
         for col, encoder in feature_encoders.items():
             if col in df_input.columns:
                 try:
@@ -110,7 +114,7 @@ def predict():
         pred_encoded = model.predict(input_scaled)[0]
         model_label = target_encoder.inverse_transform([pred_encoded])[0]
 
-        # BMI-based correction
+        # BMI logic
         if bmi < 18.5:
             corrected_label = "Insufficient_Weight"
         elif bmi < 25:
@@ -128,13 +132,12 @@ def predict():
             "Insufficient_Weight": "Underweight",
             "Normal_Weight": "Healthy",
             "Overweight_Level_I": "Borderline Obese",
-            "Overweight_Level_II": "Borderline Obese",  # not used in BMI logic, but okay
+            "Overweight_Level_II": "Borderline Obese",
             "Obesity_Type_I": "Obese (Class 1)",
             "Obesity_Type_II": "Obese (Class 2)",
             "Obesity_Type_III": "Obese (Morbid)"
         }
 
-        # Safe retrieval
         readable_category = category_map.get(str(corrected_label).strip(), "Unknown")
 
         if readable_category == "Unknown":
@@ -148,13 +151,6 @@ def predict():
             "Corrected Label": corrected_label,
             "Readable Category": readable_category
         })
-        print("\n=== DEBUG LOG START ===")
-        print("📩 Raw input JSON:", input_data)
-        print("📏 BMI value:", bmi)
-        print("✅ Corrected Label:", corrected_label)
-        print("📚 category_map keys:", list(category_map.keys()))
-        print("🎯 Readable Category:", readable_category)
-        print("=== DEBUG LOG END ===\n")
 
         return jsonify({
             "model_prediction": model_label,

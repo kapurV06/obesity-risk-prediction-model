@@ -84,7 +84,7 @@ document.addEventListener("DOMContentLoaded", () => {
     suggestionsDiv.innerHTML = "";
 
     try {
-      const response = await fetch("https://obesity-risk-prediction-model-backend1-production.up.railway.app/", {
+      const response = await fetch("https://obesity-risk-prediction-model-backend1-production.up.railway.app/predict", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(data),
